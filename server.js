@@ -1,64 +1,57 @@
-// app.js
-
 const express = require('express');
-const session = require('express-session');
-const passport = require('passport');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const axios = require('axios');
+const cors = require('cors');
+const cookieParser = require('cookie-parser') 
+const verifyToken = require('./auth');
+const { OAuth2Client } = require('google-auth-library');
 require('dotenv').config();
-const cors = require('cors'); 
+
+const CLIENT_ID = process.env.CLIENT_ID
+const client = new OAuth2Client(CLIENT_ID);
 
 const app = express();
-app.use(session({ secret: 'your_session_secret_here', resave: false, saveUninitialized: true }));
-app.use(passport.initialize());
-app.use(passport.session());
 app.use(express.json());
 app.use(cors()); 
+app.use(cookieParser());
 
-// Replace these with your credentials from Google Developers Console
-const GOOGLE_CLIENT_ID = process.env.CLIENT_ID;
-const GOOGLE_CLIENT_SECRET = process.env.CLIENT_SECRET;
-const YOUTUBE_API_KEY = process.env.API_KEY;
 
-// Passport serialization/deserialization
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((user, done) => done(null, user));
+app.post('/auth', (req, res) => {
+  let token = req.body.userToken
+  
+  // verifying the integrity
+  async function verify(){
+    // console.log(token)
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    // console.log(payload);
+  }
+  verify()
+  .then(()=>{
+    res.cookie('session-token', token);
 
-// Passport Google Strategy configuration
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: GOOGLE_CLIENT_ID,
-      clientSecret: GOOGLE_CLIENT_SECRET,
-      callbackURL: '/auth/callback',
-    },
-    (accessToken, refreshToken, profile, done) => {
-      // Save the access token in the user session for future API requests
-      profile.accessToken = accessToken;
-      return done(null, profile);
-    }
-  )
-);
+    console.log(`Token verified + ${token}`);
+    res.send('success');
+  })
+  .catch(console.error);
+  
+})
 
-// Auth route to initiate the OAuth 2.0 flow
-app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'delbertkip@gmail.com', 'https://www.googleapis.com/auth/youtube.force-ssl'] }));
 
-// Callback route to handle the OAuth 2.0 callback
-app.get('/auth/callback', passport.authenticate('google', { failureRedirect: '/' }), (req, res) => {
-  // Redirect to the main page or the page where the user can create playlists
-  res.redirect('/create-playlist');
-  console.log("Test 2")
-});
 
 // Route for creating a new playlist
-app.post('/create-playlist', async (req, res) => {
+app.post('/create-playlist', verifyToken, async (req, res) => {
   try {
     // Check if the user is authenticated (has the access token in the session)
-    if (!req.isAuthenticated() || !req.user.accessToken) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+    // if (!req.isAuthenticated() || !req.user.accessToken) {
+    //   return res.status(401).json({ error: 'Unauthorized' });
+    // }
 
     const links = req.body.links;
+
+    console.log(links)
     // Extract video IDs from links
     const videoIds = links.map(link => new URL(link).searchParams.get('v'));
 
@@ -76,7 +69,7 @@ app.post('/create-playlist', async (req, res) => {
       },
       {
         headers: {
-          Authorization: `Bearer ${req.user.accessToken}`,
+          Authorization: `Bearer ${req.cookies['session-token']}`,
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
@@ -100,7 +93,7 @@ app.post('/create-playlist', async (req, res) => {
         },
         {
           headers: {
-            Authorization: `Bearer ${req.user.accessToken}`,
+            Authorization: `Bearer ${req.cookies['session-token']}`,
             Accept: 'application/json',
             'Content-Type': 'application/json',
           },

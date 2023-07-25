@@ -1,49 +1,28 @@
-const { google } = require('googleapis');
+const { OAuth2Client } = require('google-auth-library');
 require('dotenv').config();
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.CLIENT_ID,
-  process.env.CLIENT_SECRET,
-  process.env.REDIRECT_URL // Specify your redirect_uri; you must add this to your Google API console project
-);
+const CLIENT_ID = process.env.CLIENT_ID
+const client = new OAuth2Client(CLIENT_ID);
 
-const API_K = process.env.API_KEY;
+const verifyToken = async (req, res, next) => {
+  const token = req.cookies['session-token'];
 
-const config = {
-  method: 'post',
-  maxBodyLength: Infinity,
-  url: 'https://www.googleapis.com/auth/youtube.force-ssl',
-  headers: {
-    'Content-Type':'application/json',
-    'Authorization': `Bearer ${API_K}`,
-
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
-}
 
-const authenticateWithYouTubeAPI = async () => {
-  const authorizeUrl = oauth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: 'https://www.googleapis.com/auth/youtube.force-ssl' // Ensure you have the right scopes
-  });
-
-  console.log(`Please visit this URL to authorize the application: ${authorizeUrl}`);
-
-  // Your code should pause execution and wait for the user to visit the authorize URL. 
-  // After they've authorized the app and received their code, they should paste it into the application. 
-  // This might involve creating a simple form on your webpage where the user can paste the code, then 
-  // sending it to your server with a POST request.
-  //
-  // For demonstration purposes, we'll just use a hardcoded code.
-
-  const code = "PASTE_THE_CODE_HERE";
-
-  const { tokens } = await oauth2Client.getToken(code);
-
-  // Now tokens contains the access_token and optionally refresh_token. Store these somewhere safe
-  return tokens.access_token;
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    // Optionally, you can attach the payload to the request object for further use in the route handler
+    req.user = payload;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
 };
 
-
-module.exports = {
-    authenticateWithYouTubeAPI
-}
+module.exports = verifyToken;

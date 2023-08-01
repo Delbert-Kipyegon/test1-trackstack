@@ -34,6 +34,10 @@ app.post('/auth', (req, res) => {
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   });
   res.json({accessToken: accessToken});
+
+  //links
+  const links = req.body.links;
+  playlistResponse
   
 })
 
@@ -56,10 +60,9 @@ function authenticateToken(req, res, next){
 }
 
 
-
 // Route for creating a new playlist
 app.post('/create-playlist', authenticateToken, async (req, res) => {
-    const links = req.body.links;
+    // const links = req.body.links;
   })
   
     const playlistResponse = () => {
@@ -91,7 +94,7 @@ app.post('/create-playlist', authenticateToken, async (req, res) => {
           url: 'https://www.googleapis.com/youtube/v3/playlists',
           headers: {
             'Content-Type':'application/json',
-            'Authorization':`Bearer `,
+            'Authorization':`Bearer ${token}`,
           },
           data
         }
@@ -112,7 +115,7 @@ app.post('/create-playlist', authenticateToken, async (req, res) => {
 
     
 
-    const playlistId = playlistResponse.data.id;
+    // const playlistId = playlistResponse.data.id;
 
     // // Add videos to playlist
     // for (const videoId of videoIds) {
